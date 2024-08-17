@@ -63,7 +63,7 @@ func (c *Cache) Get(key string) (value Value, ok bool) {
 		kv := elem.Value.(*entry)
 		return kv.value, true
 	}
-	return nil, false
+	return
 }
 
 func (c *Cache) Len() int {
