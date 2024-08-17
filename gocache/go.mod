@@ -1,5 +1,3 @@
-module github.com/jmLee4/go-cache
+module gocache
 
 go 1.19
-
-replace github.com/jmLee4/go-cache/gocache/lru => ./lru

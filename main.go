@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	gocache "github.com/jmLee4/go-cache"
+	"gocache"
 	"log"
 	"net/http"
 )
