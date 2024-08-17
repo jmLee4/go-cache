@@ -1,4 +1,4 @@
-package go_cache
+package gocache
 
 import (
 	"github.com/jmLee4/go-cache/lru"
