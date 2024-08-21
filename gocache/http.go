@@ -14,34 +14,34 @@ import (
 )
 
 const (
-	defaultBasePath = "/_go_cache/"
-	defaultReplicas = 50
+	DefaultBasePath = "/_go_cache/"
+	DefaultReplicas = 50
 )
 
-type HTTPPool struct {
-	self        string
-	basePath    string
-	mu          sync.Mutex
-	peers       *consistenthash.ConsistentHash
-	httpGetters map[string]*httpGetter
+type CacheServer struct {
+	selfName         string
+	basePath         string
+	mu               sync.Mutex
+	consistentHash   *consistenthash.ConsistentHash
+	addr2CacheClient map[string]*cacheClient
 }
 
-var _ PeerPicker = (*HTTPPool)(nil)
+var _ PeerPicker = (*CacheServer)(nil)
 
-func NewHTTPPool(self string) *HTTPPool {
-	return &HTTPPool{
-		self:     self,
-		basePath: defaultBasePath,
+func NewCacheServer(selfName string) *CacheServer {
+	return &CacheServer{
+		selfName: selfName,
+		basePath: DefaultBasePath,
 	}
 }
 
-func (p *HTTPPool) Log(format string, v ...interface{}) {
-	log.Printf("[Server %s] %s", p.self, fmt.Sprintf(format, v...))
+func (p *CacheServer) Log(format string, v ...interface{}) {
+	log.Printf("[GoCacheServer %s] %s", p.selfName, fmt.Sprintf(format, v...))
 }
 
-func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (p *CacheServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, p.basePath) {
-		panic("HTTPPool serving unexpected path: " + r.URL.Path)
+		panic("CacheServer serving unexpected path: " + r.URL.Path)
 	}
 	p.Log("%s %s", r.Method, r.URL.Path)
 
@@ -61,50 +61,50 @@ func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	view, err := group.Get(key)
+	value, err := group.Get(key)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	body, err := proto.Marshal(&pb.Response{Value: view.ByteSlice()})
+	body, err := proto.Marshal(&pb.Response{Value: value.ByteSlice()})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write(body)
+	_, _ = w.Write(body)
 }
 
-func (p *HTTPPool) Set(peers ...string) {
+func (p *CacheServer) Init(peers ...string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.peers = consistenthash.New(defaultReplicas, nil)
-	p.peers.InitNodes(peers...)
-	p.httpGetters = make(map[string]*httpGetter, len(peers))
+	p.consistentHash = consistenthash.New(DefaultReplicas, nil)
+	p.consistentHash.InitNodes(peers...)
+	p.addr2CacheClient = make(map[string]*cacheClient, len(peers))
 	for _, peer := range peers {
-		p.httpGetters[peer] = &httpGetter{baseURL: peer + p.basePath}
+		p.addr2CacheClient[peer] = &cacheClient{baseURL: peer + p.basePath}
 	}
 }
 
-func (p *HTTPPool) PickPeer(key string) (PeerGetter, bool) {
+func (p *CacheServer) PickPeer(key string) (PeerGetter, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if peer := p.peers.GetNode(key); peer != "" && peer != p.self {
+	if peer := p.consistentHash.GetNode(key); peer != "" && peer != p.selfName {
 		p.Log("Pick peer %s", peer)
-		return p.httpGetters[peer], true
+		return p.addr2CacheClient[peer], true
 	}
 	return nil, false
 }
 
-type httpGetter struct {
+type cacheClient struct {
 	baseURL string
 }
 
-var _ PeerGetter = (*httpGetter)(nil)
+var _ PeerGetter = (*cacheClient)(nil)
 
-func (h *httpGetter) Get(in *pb.Request, out *pb.Response) error {
+func (h *cacheClient) Get(in *pb.Request, out *pb.Response) error {
 	u := fmt.Sprintf(
 		"%v%v/%v",
 		h.baseURL,
@@ -123,12 +123,11 @@ func (h *httpGetter) Get(in *pb.Request, out *pb.Response) error {
 
 	bytes, err := io.ReadAll(res.Body)
 	if err != nil {
-		return fmt.Errorf("reading response body: %v", err)
+		return fmt.Errorf("read response body failed: %v", err)
 	}
 
-	log.Println("[Debug] Raw data:", bytes)
-	if err := proto.Unmarshal(bytes, out); err != nil {
-		return fmt.Errorf("decoding response body: %v", err)
+	if err = proto.Unmarshal(bytes, out); err != nil {
+		return fmt.Errorf("unmarshal response body failed: %v", err)
 	}
 
 	return nil

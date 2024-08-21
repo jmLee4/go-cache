@@ -32,8 +32,8 @@ func createGroup() *gocache.Group {
 }
 
 func startCacheServer(cacheServerAddr string, allCacheServerAddr []string, group *gocache.Group) {
-	cacheServer := gocache.NewHTTPPool(cacheServerAddr)
-	cacheServer.Set(allCacheServerAddr...)
+	cacheServer := gocache.NewCacheServer(cacheServerAddr)
+	cacheServer.Init(allCacheServerAddr...)
 	group.RegisterPeers(cacheServer)
 	log.Println("GoCacheServer is running at", cacheServerAddr)
 	log.Fatal(http.ListenAndServe(cacheServerAddr[7:], cacheServer))
