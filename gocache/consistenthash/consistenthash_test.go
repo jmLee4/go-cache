@@ -1,4 +1,4 @@
-package consistent_hash
+package consistenthash
 
 import (
 	"strconv"
@@ -10,7 +10,7 @@ func TestHashing(t *testing.T) {
 		i, _ := strconv.Atoi(string(key))
 		return uint32(i)
 	})
-	hash.Add("6", "4", "2")
+	hash.InitNodes("6", "4", "2")
 
 	testCases := map[string]string{
 		"2":  "2",
@@ -19,15 +19,15 @@ func TestHashing(t *testing.T) {
 		"27": "2",
 	}
 	for k, v := range testCases {
-		if hash.Get(k) != v {
+		if hash.GetNode(k) != v {
 			t.Errorf("asking for %s, should have yielded %s", k, v)
 		}
 	}
-	
-	hash.Add("8")
+
+	hash.InitNodes("8")
 	testCases["27"] = "8"
 	for k, v := range testCases {
-		if hash.Get(k) != v {
+		if hash.GetNode(k) != v {
 			t.Errorf("asking for %s, should have yielded %s", k, v)
 		}
 	}

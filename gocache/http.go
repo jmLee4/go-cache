@@ -3,7 +3,7 @@ package gocache
 import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
-	consistent_hash "gocache/consistent-hash"
+	"gocache/consistenthash"
 	pb "gocache/gocachepb"
 	"io"
 	"log"
@@ -22,7 +22,7 @@ type HTTPPool struct {
 	self        string
 	basePath    string
 	mu          sync.Mutex
-	peers       *consistent_hash.Map
+	peers       *consistenthash.ConsistentHash
 	httpGetters map[string]*httpGetter
 }
 
@@ -80,8 +80,8 @@ func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (p *HTTPPool) Set(peers ...string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.peers = consistent_hash.New(defaultReplicas, nil)
-	p.peers.Add(peers...)
+	p.peers = consistenthash.New(defaultReplicas, nil)
+	p.peers.InitNodes(peers...)
 	p.httpGetters = make(map[string]*httpGetter, len(peers))
 	for _, peer := range peers {
 		p.httpGetters[peer] = &httpGetter{baseURL: peer + p.basePath}
@@ -91,7 +91,7 @@ func (p *HTTPPool) Set(peers ...string) {
 func (p *HTTPPool) PickPeer(key string) (PeerGetter, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if peer := p.peers.Get(key); peer != "" && peer != p.self {
+	if peer := p.peers.GetNode(key); peer != "" && peer != p.self {
 		p.Log("Pick peer %s", peer)
 		return p.httpGetters[peer], true
 	}
