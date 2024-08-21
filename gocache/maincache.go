@@ -5,24 +5,23 @@ import (
 	"sync"
 )
 
-type cache struct {
+type mainCache struct {
 	mu         sync.Mutex
 	lru        *lru.Cache
 	cacheBytes int64
 }
 
-func (c *cache) add(key string, value ByteView) {
+func (c *mainCache) AddData(key string, value ByteView) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.lru == nil {
-		// Lazy Initialization
 		c.lru = lru.New(c.cacheBytes, nil)
 	}
 	c.lru.Add(key, value)
 }
 
-func (c *cache) get(key string) (value ByteView, ok bool) {
+func (c *mainCache) GetData(key string) (value ByteView, ok bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

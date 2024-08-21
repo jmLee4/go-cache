@@ -11,7 +11,7 @@ import (
 type Group struct {
 	name      string
 	getter    Getter
-	mainCache cache
+	mainCache mainCache
 	peers     PeerPicker
 	loader    *singleflight.Group
 }
@@ -41,7 +41,7 @@ func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 	g := &Group{
 		name:      name,
 		getter:    getter,
-		mainCache: cache{cacheBytes: cacheBytes},
+		mainCache: mainCache{cacheBytes: cacheBytes},
 		loader:    &singleflight.Group{},
 	}
 	groups[name] = g
@@ -68,7 +68,7 @@ func (g *Group) Get(key string) (ByteView, error) {
 		return ByteView{}, fmt.Errorf("key is required")
 	}
 
-	if v, ok := g.mainCache.get(key); ok {
+	if v, ok := g.mainCache.GetData(key); ok {
 		log.Println("[GoCache] hit", key)
 		return v, nil
 	}
@@ -114,6 +114,6 @@ func (g *Group) getLocally(key string) (ByteView, error) {
 		return ByteView{}, err
 	}
 	value := ByteView{b: cloneBytes(bytes)}
-	g.mainCache.add(key, value)
+	g.mainCache.AddData(key, value)
 	return value, nil
 }
