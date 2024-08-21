@@ -3,7 +3,7 @@ package gocache
 import (
 	"fmt"
 	pb "gocache/gocachepb"
-	single_flight "gocache/single-flight"
+	"gocache/singleflight"
 	"log"
 	"sync"
 )
@@ -13,7 +13,7 @@ type Group struct {
 	getter    Getter
 	mainCache cache
 	peers     PeerPicker
-	loader    *single_flight.Group
+	loader    *singleflight.Group
 }
 
 type Getter interface {
@@ -42,7 +42,7 @@ func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 		name:      name,
 		getter:    getter,
 		mainCache: cache{cacheBytes: cacheBytes},
-		loader:    &single_flight.Group{},
+		loader:    &singleflight.Group{},
 	}
 	groups[name] = g
 	return g
