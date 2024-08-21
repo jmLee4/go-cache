@@ -59,11 +59,11 @@ func TestGetGroup(t *testing.T) {
 		func(key string) (bytes []byte, err error) {
 			return
 		}))
-	if group := GetGroup(groupName); group == nil || group.name != groupName {
+	if group := GetGroup(groupName); group == nil || group.groupName != groupName {
 		t.Fatalf("group %s not exist", groupName)
 	}
 
 	if group := GetGroup(groupName + "111"); group != nil {
-		t.Fatalf("expect nil, but %s got", group.name)
+		t.Fatalf("expect nil, but %s got", group.groupName)
 	}
 }

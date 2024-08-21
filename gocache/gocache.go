@@ -9,7 +9,7 @@ import (
 )
 
 type Group struct {
-	name      string
+	groupName string
 	getter    Getter
 	mainCache mainCache
 	peers     PeerPicker
@@ -22,8 +22,8 @@ type Getter interface {
 
 type GetterFunc func(key string) ([]byte, error)
 
-func (f GetterFunc) Get(key string) ([]byte, error) {
-	return f(key)
+func (getter GetterFunc) Get(key string) ([]byte, error) {
+	return getter(key)
 }
 
 var (
@@ -31,7 +31,7 @@ var (
 	groups = make(map[string]*Group)
 )
 
-func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
+func NewGroup(groupName string, cacheBytes int64, getter Getter) *Group {
 	if getter == nil {
 		panic("nil Getter")
 	}
@@ -39,12 +39,12 @@ func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 	defer mu.Unlock()
 
 	g := &Group{
-		name:      name,
+		groupName: groupName,
 		getter:    getter,
 		mainCache: mainCache{cacheBytes: cacheBytes},
 		loader:    &singleflight.Group{},
 	}
-	groups[name] = g
+	groups[groupName] = g
 	return g
 }
 
@@ -58,7 +58,7 @@ func GetGroup(name string) *Group {
 
 func (g *Group) RegisterPeers(peers PeerPicker) {
 	if g.peers != nil {
-		panic("RegisterPeers called more than once")
+		panic("Peers have been registered")
 	}
 	g.peers = peers
 }
@@ -69,20 +69,20 @@ func (g *Group) Get(key string) (ByteView, error) {
 	}
 
 	if v, ok := g.mainCache.GetData(key); ok {
-		log.Println("[GoCache] hit", key)
+		log.Printf("[GoCache] Key: %s hit\n", key)
 		return v, nil
 	}
 	return g.load(key)
 }
 
 func (g *Group) load(key string) (value ByteView, err error) {
-	viewi, err := g.loader.Do(key, func() (interface{}, error) {
+	data, err := g.loader.Do(key, func() (interface{}, error) {
 		if g.peers != nil {
 			if peer, ok := g.peers.PickPeer(key); ok {
 				if value, err = g.getFromPeer(peer, key); err == nil {
 					return value, nil
 				}
-				log.Println("[GeeCache] Failed to get from peer", err)
+				log.Println("[GoCache] Failed to get from peer", err)
 			}
 		}
 
@@ -90,14 +90,14 @@ func (g *Group) load(key string) (value ByteView, err error) {
 	})
 
 	if err == nil {
-		return viewi.(ByteView), nil
+		return data.(ByteView), nil
 	}
 	return
 }
 
 func (g *Group) getFromPeer(peer PeerGetter, key string) (ByteView, error) {
 	req := &pb.Request{
-		Group: g.name,
+		Group: g.groupName,
 		Key:   key,
 	}
 	res := &pb.Response{}
