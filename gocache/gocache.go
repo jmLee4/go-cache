@@ -9,6 +9,7 @@ import (
 )
 
 type Group struct {
+	addrInfo  string
 	groupName string
 	getter    Getter
 	mainCache mainCache
@@ -31,7 +32,7 @@ var (
 	groups = make(map[string]*Group)
 )
 
-func NewGroup(groupName string, cacheBytes int64, getter Getter) *Group {
+func NewGroup(addrInfo string, groupName string, cacheBytes int64, getter Getter) *Group {
 	if getter == nil {
 		panic("nil Getter")
 	}
@@ -39,6 +40,7 @@ func NewGroup(groupName string, cacheBytes int64, getter Getter) *Group {
 	defer mu.Unlock()
 
 	g := &Group{
+		addrInfo:  addrInfo,
 		groupName: groupName,
 		getter:    getter,
 		mainCache: mainCache{cacheBytes: cacheBytes},
@@ -82,7 +84,8 @@ func (g *Group) load(key string) (value ByteView, err error) {
 				if value, err = g.getFromPeer(peer, key); err == nil {
 					return value, nil
 				}
-				log.Println("[GoCache] Failed to get from peer", err)
+				log.Println("[GoCache] Failed to get from peer,", err)
+				return nil, fmt.Errorf("failed to get from peer")
 			}
 		}
 
@@ -114,6 +117,7 @@ func (g *Group) getLocally(key string) (ByteView, error) {
 		return ByteView{}, err
 	}
 	value := ByteView{b: cloneBytes(bytes)}
+	log.Printf("[GoCacheServer %s] Found, update mainCache for key: %s\n", g.addrInfo, key)
 	g.mainCache.AddData(key, value)
 	return value, nil
 }

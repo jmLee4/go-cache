@@ -10,23 +10,31 @@ import (
 
 const (
 	APIServerRoute   = "/api"
-	APIServerKey     = "key"
-	DefaultGroupName = "scores"
+	APIServerKey     = "filename"
+	defaultGroupName = "static_files"
 )
 
-var slowDB = map[string]string{
-	"Tom":  "630",
-	"Jack": "589",
-	"Sam":  "567",
+var staticFiles = []string{
+	"apple", "flower", "horse", "house", "panda", "tiger", "tree", "man", "light",
 }
 
-func createGroup() *gocache.Group {
-	return gocache.NewGroup(DefaultGroupName, 5<<10, gocache.GetterFunc(
+var slowDB map[string]*gocache.StaticFile
+
+func initSlowDB() {
+	slowDB = make(map[string]*gocache.StaticFile)
+	for _, filename := range staticFiles {
+		slowDB[filename] = gocache.NewStaticFile(filename)
+	}
+}
+
+func createGroup(addrInfo string) *gocache.Group {
+	return gocache.NewGroup(addrInfo, defaultGroupName, 3<<20, gocache.GetterFunc(
 		func(key string) ([]byte, error) {
 			log.Println("[SlowDB] Search key", key)
 			if v, ok := slowDB[key]; ok {
-				return []byte(v), nil
+				return v.GetContent(), nil
 			}
+			log.Printf("[SlowDB] %s not exist", key)
 			return nil, fmt.Errorf("%s not exist", key)
 		}))
 }
@@ -43,13 +51,14 @@ func startAPIServer(apiAddr string, group *gocache.Group) {
 	http.Handle(APIServerRoute, http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			key := r.URL.Query().Get(APIServerKey)
+			log.Println()
+			log.Println("[APIServer] Get query for key:", key)
 			view, err := group.Get(key)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			// TODO: Change file name
-			w.Header().Set("Content-Disposition", "attachment; filename=\"temp.txt\"")
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.jpg\"", key))
 			w.Header().Set("Content-Type", "application/octet-stream")
 			_, _ = w.Write(view.ByteSlice())
 		}))
@@ -76,7 +85,9 @@ func main() {
 		allCacheServerAddr = append(allCacheServerAddr, addr)
 	}
 
-	group := createGroup()
+	initSlowDB()
+
+	group := createGroup(port2Addr[cacheServerPort])
 	if startAPIServerFlag {
 		go startAPIServer(apiAddr, group)
 	}

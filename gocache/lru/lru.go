@@ -1,6 +1,9 @@
 package lru
 
-import "container/list"
+import (
+	"container/list"
+	"log"
+)
 
 type Cache struct {
 	maxBytes  int64
@@ -20,6 +23,11 @@ type Value interface {
 }
 
 func New(maxBytes int64, onEvicted func(string, Value)) *Cache {
+	if onEvicted == nil {
+		onEvicted = func(key string, value Value) {
+			log.Printf("Warning: key %s is expired\n", key)
+		}
+	}
 	return &Cache{
 		maxBytes:  maxBytes,
 		ll:        list.New(),

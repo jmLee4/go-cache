@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	DefaultBasePath = "/_go_cache/"
-	DefaultReplicas = 50
+	defaultBasePath = "/_go_cache/"
+	defaultReplicas = 50
 )
 
 type CacheServer struct {
@@ -31,7 +31,7 @@ var _ PeerPicker = (*CacheServer)(nil)
 func NewCacheServer(selfName string) *CacheServer {
 	return &CacheServer{
 		selfName: selfName,
-		basePath: DefaultBasePath,
+		basePath: defaultBasePath,
 	}
 }
 
@@ -80,7 +80,7 @@ func (p *CacheServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (p *CacheServer) Init(peers ...string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.consistentHash = consistenthash.New(DefaultReplicas, nil)
+	p.consistentHash = consistenthash.New(defaultReplicas, nil)
 	p.consistentHash.InitNodes(peers...)
 	p.addr2CacheClient = make(map[string]*cacheClient, len(peers))
 	for _, peer := range peers {
